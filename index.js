@@ -11,11 +11,6 @@ app.use(cors())
 app.use(bodyParser.json())
 app.use(logger)
 
-
-app.get('/', (req, res) => {
-    res.send('<h1>Hello World!</h1>')
-})
-
 app.get('/notes/:id', (request, response, next) => {
     Note.findById(request.params.id)
         .then(note => {
