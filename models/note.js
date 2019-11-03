@@ -2,12 +2,13 @@ const mongoose = require('mongoose')
 
 mongoose.set('useFindAndModify', false)
 
+// eslint-disable-next-line no-undef
 const url = process.env.MONGODB_URI
 
 console.log('connecting to mongo')
 
 mongoose.connect(url, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(result => {
+  .then(() => {
     console.log('connected to MongoDB')
   })
   .catch((error) => {
@@ -15,8 +16,15 @@ mongoose.connect(url, { useNewUrlParser: true, useUnifiedTopology: true })
   })
 
 const noteSchema = new mongoose.Schema({
-  content: String,
-  date: Date,
+  content: {
+    type: String,
+    minlength: 5,
+    required: true
+  },
+  date: {
+    type: Date,
+    required: true
+  },
   important: Boolean,
 })
 
