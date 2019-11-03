@@ -1,55 +1,40 @@
+require('dotenv').config()
 const express = require('express')
 const app = express()
 const bodyParser = require('body-parser')
-const {requestLogger} = require('./requestLogger')
+const { logger } = require('./middleware/requestLogger')
+const { errorHandler } = require('./middleware/errorHandler')
 const cors = require('cors')
+const Note = require('./models/note')
 
 app.use(cors())
-app.use(requestLogger)
 app.use(bodyParser.json())
-app.use(requestLogger)
+app.use(logger)
 
-let notes = [
-    {
-        id: 1,
-        content: "HTML is easy",
-        date: "2019-05-30T17:30:31.098Z",
-        important: true
-    },
-    {
-        id: 2,
-        content: "Browser can execute only Javascript",
-        date: "2019-05-30T18:39:34.091Z",
-        important: false
-    },
-    {
-        id: 3,
-        content: "GET and POST are the most important methods of HTTP protocol",
-        date: "2019-05-30T19:20:14.298Z",
-        important: true
-    }
-]
 
 app.get('/', (req, res) => {
     res.send('<h1>Hello World!</h1>')
 })
 
-app.get('/notes/:id', (request, response) => {
-    const id = Number(request.params.id)
-    const note = notes.find(n => n.id === id)
-    if (note) {
-        response.json(note)
-      } else {
-        response.status(404).end()
-      }
+app.get('/notes/:id', (request, response, next) => {
+    Note.findById(request.params.id)
+        .then(note => {
+            if (note) {
+                response.json(note.toJSON())
+            } else {
+                response.status(404).end()
+            }
+        })
+        .catch(error => next(error))
 })
 
 app.get('/notes', (request, reponse) => {
-    reponse.json(notes)
-})
+    Note.find({})
+        .then(notes => {
+            reponse.json(notes.map(note => note.toJSON()))
+        })
 
-const generateId = () => notes.length > 0 ?
-    Math.max(...notes.map(n => n.id)) + 1 : 1
+})
 
 app.post('/notes', (request, response) => {
     const body = request.body
@@ -58,29 +43,50 @@ app.post('/notes', (request, response) => {
             error: "Content missing"
         })
     }
-    const {content, important} = body
-    const note = {
-        id: generateId(),
+    const { content, important } = body
+    const note = new Note({
         content,
         important: important || false,
-        data: new Date()
-    }
-    notes = notes.concat(note)
-    response.json(note)
+        date: new Date()
+    })
+    note.save()
+        .then(result => {
+            response.json(result.toJSON())
+        })
+        .catch(error => console.error('error saving', error))
 })
 
-app.delete('/notes/:id', (request, response) => {
-    const id = Number(request.params.id)
-    notes = notes.filter(n => n.id !== id)
-    response.status(204).end()
+app.put('/notes/:id', (request, response, next) => {
+    const body = request.body
+
+    const note = {
+        content: body.content,
+        important: body.important,
+    }
+
+    Note.findByIdAndUpdate(request.params.id, note, { new: true })
+        .then(updatedNote => {
+            response.json(updatedNote.toJSON())
+        })
+        .catch(error => next(error))
+})
+
+app.delete('/notes/:id', (request, response, next) => {
+    Note.findByIdAndRemove(request.params.id)
+        .then(result => {
+            response.status(204).end()
+        })
+        .catch(error => next(error))
 })
 
 const unknownEndpoint = (request, response) => {
     response.status(404).send({ error: 'Unknown endpoint' })
-  }
-  
+}
+
 app.use(unknownEndpoint)
 
-const PORT = process.env.PORT || 3001
+app.use(errorHandler)
+
+const PORT = process.env.PORT
 app.listen(PORT)
 console.log(`Server running on port ${PORT}`)
