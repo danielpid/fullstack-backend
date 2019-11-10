@@ -1,6 +1,8 @@
+const config = require('../utils/config')
+
 const info = (...params) => {
   // eslint-disable-next-line no-undef
-  if (process.env.NODE_ENV !== 'test') {
+  if (config.env !== 'test') {
     console.log(...params)
   }
 }

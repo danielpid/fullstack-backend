@@ -5,14 +5,38 @@ const app = require('../app')
 const api = supertest(app)
 
 const Note = require('../models/note')
+const User = require('../models/user')
+
+let token
+
+beforeAll(async () => {
+  await User.deleteMany({})
+  await api
+    .post('/api/users')
+    .send(helper.initialUser)
+
+  const response = await api
+    .post('/api/login')
+    .send({
+      username: helper.initialUser.username,
+      password: helper.initialUser.password,
+    })
+  token = response.body.token
+})
 
 beforeEach(async () => {
   await Note.deleteMany({})
 
+  const user = await helper.userInDb()
+
   const noteObjects = helper.initialNotes
-    .map(note => new Note(note))
+    .map(note => new Note({
+      ...note,
+      user: user._id
+    }))
   const promiseArray = noteObjects.map(note => note.save())
   await Promise.all(promiseArray)
+
 })
 
 describe('when there is initially some notes saved', () => {
@@ -55,8 +79,6 @@ describe('when there is initially some notes saved', () => {
     test('fails with statuscode 404 if note does not exist', async () => {
       const validNonexistingId = await helper.nonExistingId()
 
-      console.log(validNonexistingId)
-
       await api
         .get(`/api/notes/${validNonexistingId}`)
         .expect(404)
@@ -73,14 +95,16 @@ describe('when there is initially some notes saved', () => {
 
   describe('addition of a new note', () => {
     test('succeeds with valid data', async () => {
+
       const newNote = {
         content: 'async/await simplifies making async calls',
-        important: true,
+        important: true
       }
 
       await api
         .post('/api/notes')
         .send(newNote)
+        .set({ Authorization: `Bearer ${token}` })
         .expect(200)
         .expect('Content-Type', /application\/json/)
 
@@ -102,6 +126,7 @@ describe('when there is initially some notes saved', () => {
       await api
         .post('/api/notes')
         .send(newNote)
+        .set({ Authorization: `Bearer ${token}` })
         .expect(400)
 
       const notesAtEnd = await helper.notesInDb()
